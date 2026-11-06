@@ -72,7 +72,7 @@ export function CardsStats() {
                   left: 10,
                   bottom: 0,
                 }}
-                className="stroke-primary"
+                className="stroke-chart-1"
               >
                 <Line
                   type="monotone"
@@ -82,7 +82,7 @@ export function CardsStats() {
                     r: 6,
                     style: { fill: "var(--theme-primary)", opacity: 0.25 },
                   }}
-                  className="[&_path]:stroke-primary [&_circle]:stroke-primary fill-primary"
+                  className="[&_path]:stroke-chart-1 [&_circle]:stroke-chart-1 fill-chart-1"
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -101,7 +101,7 @@ export function CardsStats() {
           <div className="mt-4 h-[80px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data}>
-                <Bar dataKey="subscription" className="fill-primary" />
+                <Bar dataKey="subscription" className="fill-chart-2" />
               </BarChart>
             </ResponsiveContainer>
           </div>

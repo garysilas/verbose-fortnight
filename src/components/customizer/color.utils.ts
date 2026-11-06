@@ -1,74 +1,96 @@
-export interface HSLColor {
-  h: number;
-  s: number;
-  l: number;
-}
-export function hexToHSL(H: string) {
-  let r = 0,
-    g = 0,
-    b = 0;
-  if (H.length === 4) {
-    r = parseInt("0x" + H[1] + H[1], 16);
-    g = parseInt("0x" + H[2] + H[2], 16);
-    b = parseInt("0x" + H[3] + H[3], 16);
-  } else if (H.length === 7) {
-    r = parseInt("0x" + H[1] + H[2], 16);
-    g = parseInt("0x" + H[3] + H[4], 16);
-    b = parseInt("0x" + H[5] + H[6], 16);
-  }
+// Colour conversion between hex (picker input/display) and oklch (stored).
+// Rounding matches scripts/convert-themes.mjs: three decimals for lightness
+// and chroma, one for hue, hue normalised to 0 when chroma rounds to zero.
 
-  r /= 255;
-  g /= 255;
-  b /= 255;
-  const max = Math.max(r, g, b),
-    min = Math.min(r, g, b);
-  let h = 0,
-    s = 0,
-    l = (max + min) / 2;
-  if (max == min) {
-    h = s = 0;
-  } else {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r:
-        h = (g - b) / d + (g < b ? 6 : 0);
-        break;
-      case g:
-        h = (b - r) / d + 2;
-        break;
-      case b:
-        h = (r - g) / d + 4;
-        break;
-    }
-    h /= 6;
-  }
-  return { h: h * 360, s: s * 100, l: l * 100 };
+function srgbToLinear(c: number): number {
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
 }
 
-export function hslToHex(hsl: HSLColor | string): string {
-  let h: number, s: number, l: number;
-  if (typeof hsl === "string") {
-    const [hVal, sVal, lVal] = hsl.split(" ").map((val, index) => {
-      return index === 0 ? parseFloat(val) : parseFloat(val.replace("%", ""));
-    });
-    h = hVal;
-    s = sVal;
-    l = lVal;
-  } else {
-    h = hsl.h;
-    s = hsl.s;
-    l = hsl.l;
-  }
+function linearToSrgb(c: number): number {
+  return c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+}
 
-  l /= 100;
-  const a = (s * Math.min(l, 1 - l)) / 100;
-  const f = (n: number) => {
-    const k = (n + h / 30) % 12;
-    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-    return Math.round(255 * color)
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  let value = hex.replace("#", "");
+  if (value.length === 3) {
+    value = value
+      .split("")
+      .map((c) => c + c)
+      .join("");
+  }
+  const n = parseInt(value, 16);
+  if (Number.isNaN(n)) return { r: 0, g: 0, b: 0 };
+  return { r: ((n >> 16) & 255) / 255, g: ((n >> 8) & 255) / 255, b: (n & 255) / 255 };
+}
+
+function rgbToOklch(r: number, g: number, b: number): {
+  L: number;
+  C: number;
+  H: number;
+} {
+  const lr = srgbToLinear(r);
+  const lg = srgbToLinear(g);
+  const lb = srgbToLinear(b);
+  const l_ = 0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb;
+  const m_ = 0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb;
+  const s_ = 0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb;
+  const l = Math.cbrt(l_);
+  const m = Math.cbrt(m_);
+  const s = Math.cbrt(s_);
+  const L = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s;
+  const a = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
+  const b_ = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
+  const C = Math.sqrt(a * a + b_ * b_);
+  const H = (Math.atan2(b_, a) * 180) / Math.PI;
+  return { L, C, H: (H + 360) % 360 };
+}
+
+function oklchToRgb(L: number, C: number, H: number): {
+  r: number;
+  g: number;
+  b: number;
+} {
+  const hr = (H * Math.PI) / 180;
+  const a = C * Math.cos(hr);
+  const b_ = C * Math.sin(hr);
+  const l = L + 0.3963377774 * a + 0.2158037573 * b_;
+  const m = L - 0.1055613458 * a - 0.0638541728 * b_;
+  const s = L - 0.0894841775 * a - 1.291485548 * b_;
+  const lr = 4.0767416621 * l ** 3 - 3.3077115913 * m ** 3 + 0.2309699292 * s ** 3;
+  const lg = -1.2684380046 * l ** 3 + 2.6097574011 * m ** 3 - 0.3413193965 * s ** 3;
+  const lb = -0.0041960863 * l ** 3 - 0.7034186147 * m ** 3 + 1.707614701 * s ** 3;
+  const clamp = (c: number) => Math.min(1, Math.max(0, c));
+  return {
+    r: clamp(linearToSrgb(lr)),
+    g: clamp(linearToSrgb(lg)),
+    b: clamp(linearToSrgb(lb)),
+  };
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  const c = (v: number) =>
+    Math.round(Math.min(255, Math.max(0, v * 255)))
       .toString(16)
       .padStart(2, "0");
-  };
-  return `#${f(0)}${f(8)}${f(4)}`;
+  return `#${c(r)}${c(g)}${c(b)}`;
+}
+
+export function hexToOklch(hex: string): string {
+  const { r, g, b } = hexToRgb(hex);
+  const { L, C, H } = rgbToOklch(r, g, b);
+  const L3 = Number(L.toFixed(3));
+  const C3 = Number(C.toFixed(3));
+  const H1 = C3 === 0 ? 0 : Number(H.toFixed(1));
+  return `oklch(${L3} ${C3} ${H1})`;
+}
+
+export function oklchToHex(oklch: string): string {
+  const match = oklch.match(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/);
+  if (!match) return "#000000";
+  const { r, g, b } = oklchToRgb(
+    parseFloat(match[1]),
+    parseFloat(match[2]),
+    parseFloat(match[3])
+  );
+  return rgbToHex(r, g, b);
 }

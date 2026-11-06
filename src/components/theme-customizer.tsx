@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { CheckIcon, CopyIcon } from "@radix-ui/react-icons";
-import template from "lodash.template";
 import { Paintbrush } from "lucide-react";
 import { useTheme } from "next-themes";
 
@@ -26,7 +25,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CssVars, Theme, themes } from "@/registry/themes";
+import { themes } from "@/registry/themes";
+import { deriveThemeCssVars } from "@/registry/theme-derive";
+import { buildThemeCss } from "@/registry/theme-export";
 
 import "@/styles/mdx.css";
 import { Drawer } from "vaul";
@@ -42,6 +43,7 @@ import ColorSection from "./customizer/color-section";
 import RadiusSection from "./customizer/radius-section";
 import ModeSection from "./customizer/mode-section";
 import ColorPickerSection from "./customizer/color-picker-section";
+import { ParametersSection } from "./customizer/parameters-section";
 
 export function ThemeCustomizer() {
   const [config, setConfig] = useConfig();
@@ -84,7 +86,7 @@ export function ThemeCustomizer() {
                         onClick={() =>
                           setConfig({
                             theme: theme.name,
-                            cssVars: theme.cssVars as any,
+                            cssVars: deriveThemeCssVars(theme),
                             style: "default",
                           })
                         }
@@ -96,11 +98,11 @@ export function ThemeCustomizer() {
                         )}
                         style={
                           {
-                            "--theme-primary": `hsl(${
+                            "--theme-primary": `${
                               theme?.activeColor[
                                 mode === "dark" ? "dark" : "light"
                               ]
-                            })`,
+                            }`,
                           } as React.CSSProperties
                         }
                       >
@@ -171,6 +173,7 @@ export function Customizer({ className }: { className?: string }) {
         <RadiusSection />
         <ModeSection />
         <ColorPickerSection />
+        <ParametersSection />
         <CopyCodeButton />
       </div>
     </ThemeWrapper>
@@ -196,10 +199,7 @@ export function CopyCodeButton() {
         <Button
           onClick={() => {
             copyToClipboardWithMeta(
-              getThemeCode(
-                activeTheme as any,
-                config.cssVars.light?.radius || 0.5
-              ),
+              buildThemeCss(config),
               {
                 name: "copy_theme_code",
                 properties: {
@@ -227,7 +227,7 @@ export function CopyCodeButton() {
             Copy code
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-w-2xl outline-none">
+        <DialogContent className="max-w-2xl outline-hidden">
           <DialogHeader>
             <DialogTitle>Theme</DialogTitle>
             <DialogDescription>
@@ -241,10 +241,7 @@ export function CopyCodeButton() {
                 size="sm"
                 onClick={() => {
                   copyToClipboardWithMeta(
-                    getThemeCode(
-                      activeTheme as any,
-                      config.cssVars.light?.radius || 0.5
-                    ),
+                    buildThemeCss(config),
                     {
                       name: "copy_theme_code",
                       properties: {
@@ -274,191 +271,17 @@ export function CopyCodeButton() {
 
 function CustomizerCode() {
   const [config] = useConfig();
-  const activeTheme = config;
+  const css = buildThemeCss(config);
 
   return (
     <ThemeWrapper defaultTheme="zinc" className="relative space-y-4">
       <div data-rehype-pretty-code-fragment="">
         <pre className="max-h-[450px] overflow-x-auto rounded-lg border bg-zinc-950 py-4 dark:bg-zinc-900">
           <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm">
-            <span className="text-white line">@layer base &#123;</span>
-            <span className="text-white line">&nbsp;&nbsp;:root &#123;</span>
-            <span className="text-white line">
-              &nbsp;&nbsp;&nbsp;&nbsp;--background:{" "}
-              {activeTheme?.cssVars.light["background"]};
-            </span>
-            <span className="text-white line">
-              &nbsp;&nbsp;&nbsp;&nbsp;--foreground:{" "}
-              {activeTheme?.cssVars.light["foreground"]};
-            </span>
-            {[
-              "card",
-              "popover",
-              "primary",
-              "secondary",
-              "muted",
-              "accent",
-              "destructive",
-            ].map((prefix) => (
-              <>
-                <span className="text-white line">
-                  &nbsp;&nbsp;&nbsp;&nbsp;--{prefix}:{" "}
-                  {
-                    activeTheme?.cssVars.light[
-                      prefix as keyof typeof activeTheme.cssVars.light
-                    ]
-                  }
-                  ;
-                </span>
-                <span className="text-white line">
-                  &nbsp;&nbsp;&nbsp;&nbsp;--{prefix}-foreground:{" "}
-                  {
-                    activeTheme?.cssVars.light[
-                      `${prefix}-foreground` as keyof typeof activeTheme.cssVars.light
-                    ]
-                  }
-                  ;
-                </span>
-              </>
-            ))}
-            <span className="text-white line">
-              &nbsp;&nbsp;&nbsp;&nbsp;--border:{" "}
-              {activeTheme?.cssVars.light["border"]};
-            </span>
-            <span className="text-white line">
-              &nbsp;&nbsp;&nbsp;&nbsp;--input:{" "}
-              {activeTheme?.cssVars.light["input"]};
-            </span>
-            <span className="text-white line">
-              &nbsp;&nbsp;&nbsp;&nbsp;--ring:{" "}
-              {activeTheme?.cssVars.light["ring"]};
-            </span>
-            <span className="text-white line">
-              &nbsp;&nbsp;&nbsp;&nbsp;--radius: {config.cssVars.light?.radius}
-              rem;
-            </span>
-            <span className="text-white line">&nbsp;&nbsp;&#125;</span>
-            <span className="text-white line">&nbsp;</span>
-            <span className="text-white line">&nbsp;&nbsp;.dark &#123;</span>
-            <span className="text-white line">
-              &nbsp;&nbsp;&nbsp;&nbsp;--background:{" "}
-              {activeTheme?.cssVars.dark["background"]};
-            </span>
-            <span className="text-white line">
-              &nbsp;&nbsp;&nbsp;&nbsp;--foreground:{" "}
-              {activeTheme?.cssVars.dark["foreground"]};
-            </span>
-            {[
-              "card",
-              "popover",
-              "primary",
-              "secondary",
-              "muted",
-              "accent",
-              "destructive",
-            ].map((prefix) => (
-              <>
-                <span className="text-white line">
-                  &nbsp;&nbsp;&nbsp;&nbsp;--{prefix}:{" "}
-                  {
-                    activeTheme?.cssVars.dark[
-                      prefix as keyof typeof activeTheme.cssVars.dark
-                    ]
-                  }
-                  ;
-                </span>
-                <span className="text-white line">
-                  &nbsp;&nbsp;&nbsp;&nbsp;--{prefix}-foreground:{" "}
-                  {
-                    activeTheme?.cssVars.dark[
-                      `${prefix}-foreground` as keyof typeof activeTheme.cssVars.dark
-                    ]
-                  }
-                  ;
-                </span>
-              </>
-            ))}
-            <span className="text-white line">
-              &nbsp;&nbsp;&nbsp;&nbsp;--border:{" "}
-              {activeTheme?.cssVars.dark["border"]};
-            </span>
-            <span className="text-white line">
-              &nbsp;&nbsp;&nbsp;&nbsp;--input:{" "}
-              {activeTheme?.cssVars.dark["input"]};
-            </span>
-            <span className="text-white line">
-              &nbsp;&nbsp;&nbsp;&nbsp;--ring:{" "}
-              {activeTheme?.cssVars.dark["ring"]};
-            </span>
-            <span className="text-white line">&nbsp;&nbsp;&#125;</span>
-            <span className="text-white line">&#125;</span>
+            {css}
           </code>
         </pre>
       </div>
     </ThemeWrapper>
   );
 }
-
-function getThemeCode(theme: Theme, radius?: number) {
-  if (!theme) {
-    return "";
-  }
-
-  if (!radius) {
-    radius = 0.5;
-  }
-
-  return template(BASE_STYLES_WITH_VARIABLES)({
-    colors: theme.cssVars,
-    radius,
-  });
-}
-
-const BASE_STYLES_WITH_VARIABLES = `
-@layer base {
-  :root {
-    --background: <%- colors.light["background"] %>;
-    --foreground: <%- colors.light["foreground"] %>;
-    --card: <%- colors.light["card"] %>;
-    --card-foreground: <%- colors.light["card-foreground"] %>;
-    --popover: <%- colors.light["popover"] %>;
-    --popover-foreground: <%- colors.light["popover-foreground"] %>;
-    --primary: <%- colors.light["primary"] %>;
-    --primary-foreground: <%- colors.light["primary-foreground"] %>;
-    --secondary: <%- colors.light["secondary"] %>;
-    --secondary-foreground: <%- colors.light["secondary-foreground"] %>;
-    --muted: <%- colors.light["muted"] %>;
-    --muted-foreground: <%- colors.light["muted-foreground"] %>;
-    --accent: <%- colors.light["accent"] %>;
-    --accent-foreground: <%- colors.light["accent-foreground"] %>;
-    --destructive: <%- colors.light["destructive"] %>;
-    --destructive-foreground: <%- colors.light["destructive-foreground"] %>;
-    --border: <%- colors.light["border"] %>;
-    --input: <%- colors.light["input"] %>;
-    --ring: <%- colors.light["ring"] %>;
-    --radius: <%- radius %>rem;
-  }
- 
-  .dark {
-    --background: <%- colors.dark["background"] %>;
-    --foreground: <%- colors.dark["foreground"] %>;
-    --card: <%- colors.dark["card"] %>;
-    --card-foreground: <%- colors.dark["card-foreground"] %>;
-    --popover: <%- colors.dark["popover"] %>;
-    --popover-foreground: <%- colors.dark["popover-foreground"] %>;
-    --primary: <%- colors.dark["primary"] %>;
-    --primary-foreground: <%- colors.dark["primary-foreground"] %>;
-    --secondary: <%- colors.dark["secondary"] %>;
-    --secondary-foreground: <%- colors.dark["secondary-foreground"] %>;
-    --muted: <%- colors.dark["muted"] %>;
-    --muted-foreground: <%- colors.dark["muted-foreground"] %>;
-    --accent: <%- colors.dark["accent"] %>;
-    --accent-foreground: <%- colors.dark["accent-foreground"] %>;
-    --destructive: <%- colors.dark["destructive"] %>;
-    --destructive-foreground: <%- colors.dark["destructive-foreground"] %>;
-    --border: <%- colors.dark["border"] %>;
-    --input: <%- colors.dark["input"] %>;
-    --ring: <%- colors.dark["ring"] %>;
-  }
-}
-`;

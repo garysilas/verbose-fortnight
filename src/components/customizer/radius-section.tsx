@@ -25,13 +25,13 @@ const RadiusSection: React.FC = () => {
 										...config.cssVars,
 										light: {
 											...config.cssVars.light,
-											radius: parseFloat(value),
+											radius: `${value}rem`,
 										}
 									},
 								});
 							}}
 							className={cn(
-								config.cssVars.light?.radius === parseFloat(value) &&
+								config.cssVars.light?.radius === `${value}rem` &&
 									"border-2 border-primary",
 								"flex gap-2 items-center justify-center",
 							)}
@@ -45,7 +45,7 @@ const RadiusSection: React.FC = () => {
 									"border-l-2 border-t-2 border-primary/70",
 									{
 										grayscale:
-											config.cssVars.light?.radius !== parseFloat(value),
+											config.cssVars.light?.radius !== `${value}rem`,
 									},
 								)}
 							/>

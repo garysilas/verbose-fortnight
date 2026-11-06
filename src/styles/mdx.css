@@ -1,3 +1,5 @@
+@reference "../app/globals.css";
+
 [data-theme="light"] {
   display: block;
 }

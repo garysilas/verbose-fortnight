@@ -67,7 +67,7 @@ export function CardsMetric() {
                 left: 10,
                 bottom: 0,
               }}
-              className="fill-primary"
+              className="fill-chart-1"
             >
               <Tooltip
                 content={({ active, payload }) => {
@@ -107,7 +107,7 @@ export function CardsMetric() {
                   r: 6,
                   style: { fill: "var(--theme-primary)", opacity: 0.25 },
                 }}
-                className="[&_path]:stroke-primary [&_circle]:stroke-primary fill-primary"
+                className="[&_path]:stroke-chart-1 [&_circle]:stroke-chart-1 fill-chart-1"
               />
               <Line
                 type="monotone"
@@ -117,7 +117,7 @@ export function CardsMetric() {
                   r: 8,
                   style: { fill: "var(--theme-primary)" },
                 }}
-                className="[&_path]:stroke-primary [&_circle]:stroke-primary fill-primary"
+                className="[&_path]:stroke-chart-2 [&_circle]:stroke-chart-2 fill-chart-2"
               />
             </LineChart>
           </ResponsiveContainer>

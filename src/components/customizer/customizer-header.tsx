@@ -1,7 +1,9 @@
 import { ResetIcon } from "@radix-ui/react-icons";
 import { Button } from "../ui/button";
 import { useConfig } from "@/hooks/use-config";
-import { CssVars, themes } from "@/registry/themes";
+import { deriveThemeCssVars } from "@/registry/theme-derive";
+import { themes } from "@/registry/themes";
+import { ImportDialog } from "./import-dialog";
 
 const CustomizerHeader: React.FC = () => {
   const [, setConfig] = useConfig();
@@ -10,8 +12,9 @@ const CustomizerHeader: React.FC = () => {
     setConfig({
       theme: "zinc",
       style: "default",
-      cssVars: themes.find((theme) => theme.name === "zinc")
-        ?.cssVars as CssVars,
+      cssVars: deriveThemeCssVars(
+        themes.find((theme) => theme.name === "zinc")!
+      ),
     });
   };
 
@@ -25,6 +28,7 @@ const CustomizerHeader: React.FC = () => {
           Pick a style and color for your components.
         </div>
       </div>
+      <ImportDialog />
       <Button
         variant="ghost"
         size="icon"

@@ -108,7 +108,7 @@ export function CardsActivityGoal() {
         <div className="my-3 h-[60px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data}>
-              <Bar dataKey="goal" className="fill-primary opacity-25" />
+              <Bar dataKey="goal" className="fill-chart-1 opacity-25" />
             </BarChart>
           </ResponsiveContainer>
         </div>

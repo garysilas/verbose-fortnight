@@ -6,12 +6,33 @@ import { useConfig } from "@/hooks/use-config";
 import { CssVars } from "@/registry/themes";
 import { cn } from "@/lib/utils";
 import { Input } from "../ui/input";
-import { hexToHSL, hslToHex } from "./color.utils";
+import { hexToOklch, oklchToHex } from "./color.utils";
 import { PipetteIcon } from "lucide-react";
 
+const SEMANTIC_COLOR_KEYS = new Set([
+  "background",
+  "foreground",
+  "card",
+  "card-foreground",
+  "popover",
+  "popover-foreground",
+  "primary",
+  "primary-foreground",
+  "secondary",
+  "secondary-foreground",
+  "muted",
+  "muted-foreground",
+  "accent",
+  "accent-foreground",
+  "destructive",
+  "destructive-foreground",
+  "border",
+  "input",
+  "ring",
+]);
+
 const ColorPickerSection: React.FC = () => {
-  const [config, setConfig] = useConfig();
-  const { resolvedTheme: mode } = useTheme();
+  const [config, setConfig] = useConfig();  const { resolvedTheme: mode } = useTheme();
   const [colorInfo, setColorInfo] = useState<{
     value: string;
     key: keyof CssVars["light"];
@@ -23,9 +44,11 @@ const ColorPickerSection: React.FC = () => {
       return {};
     }
 
-    return Object.keys(config.cssVars[mode]).reduce<{
-      [key: string]: string[];
-    }>((acc, key) => {
+    return Object.keys(config.cssVars[mode])
+      .filter((key) => SEMANTIC_COLOR_KEYS.has(key))
+      .reduce<{
+        [key: string]: string[];
+      }>((acc, key) => {
       const baseKey = key.endsWith("-foreground") ? key.slice(0, -11) : key;
       acc[baseKey] = acc[baseKey] || [];
       acc[baseKey].push(key);
@@ -43,10 +66,7 @@ const ColorPickerSection: React.FC = () => {
   useEffect(() => {
     if (debouncedColorInfo) {
       const { value, key } = debouncedColorInfo;
-      const hsl = hexToHSL(value);
-      const formattedHsl = `${hsl.h.toFixed(1)} ${hsl.s.toFixed(
-        1
-      )}% ${hsl.l.toFixed(1)}%`;
+      const oklch = hexToOklch(value);
 
       if (mode) {
         setConfig({
@@ -55,7 +75,7 @@ const ColorPickerSection: React.FC = () => {
             ...config.cssVars,
             [mode]: {
               ...config.cssVars[mode as keyof typeof config.cssVars],
-              [key]: formattedHsl,
+              [key]: oklch,
             },
           },
         });
@@ -69,16 +89,16 @@ const ColorPickerSection: React.FC = () => {
   ): React.CSSProperties => {
     if (!mode) return {};
     return {
-      "--theme-primary": `hsl(${
+      "--theme-primary": `${
         config.cssVars[mode as keyof typeof config.cssVars][
           key as keyof (typeof config.cssVars)["light"]
         ]
-      })`,
+      }`,
     } as React.CSSProperties;
   };
 
   const getValue = (key: keyof CssVars["light"], mode: string | undefined) => {
-    return hslToHex(
+    return oklchToHex(
       config.cssVars[mode as keyof typeof config.cssVars][
         key as keyof CssVars["light"]
       ] as string

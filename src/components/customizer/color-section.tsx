@@ -1,4 +1,5 @@
 import { useConfig } from "@/hooks/use-config";
+import { deriveThemeCssVars } from "@/registry/theme-derive";
 import { themes } from "@/registry/themes";
 import React from "react";
 import { Label } from "../ui/label";
@@ -31,18 +32,18 @@ const ColorSection: React.FC = () => {
 							key={theme.name}
 							onClick={() => {
 								const { radius } = config.cssVars.light;
+								const derived = deriveThemeCssVars(theme);
 
 								setConfig({
 									...config,
 									theme: theme.name,
 									cssVars: {
-										...theme.cssVars,
 										light: {
-											...theme.cssVars.light,
+											...derived.light,
 											radius,
 										},
 										dark: {
-											...theme.cssVars.dark,
+											...derived.dark,
 											radius,
 										},
 									},
@@ -54,9 +55,9 @@ const ColorSection: React.FC = () => {
 							)}
 							style={
 								{
-									"--theme-primary": `hsl(${
+									"--theme-primary": `${
 										theme?.activeColor[mode === "dark" ? "dark" : "light"]
-									})`,
+									}`,
 								} as React.CSSProperties
 							}
 						>
