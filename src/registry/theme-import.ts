@@ -67,6 +67,15 @@ const THEME_AUTHORITY_KEYS = new Set<string>([
   "radius",
 ]);
 
+const TEXT_KEYS = new Set<string>([...FONT_KEYS, "letter-spacing", "spacing"]);
+
+const SHADOW_LENGTH_KEYS = new Set<string>([
+  "shadow-blur",
+  "shadow-spread",
+  "shadow-offset-x",
+  "shadow-offset-y",
+]);
+
 function normaliseOklch(value: string): string | null {
   const match = value
     .trim()
@@ -115,6 +124,23 @@ function normaliseColor(key: string, value: string): string | null {
 }
 export { normaliseColor };
 
+export const MAX_PAYLOAD_BYTES = 256 * 1024;
+
+/**
+ * Parse a fetched body with a hard size cap. Returns ok:true only when the
+ * body is within the cap and valid JSON.
+ */
+export function parsePayloadText(
+  text: string
+): { ok: true; value: unknown } | { ok: false } {
+  if (text.length > MAX_PAYLOAD_BYTES) return { ok: false };
+  try {
+    return { ok: true, value: JSON.parse(text) };
+  } catch {
+    return { ok: false };
+  }
+}
+
 const LINK_HOST = "(?:https://)?(?:www\\.)?tweakcn\\.com";
 
 /** Extract a theme id from one of the two accepted link shapes, or null. */
@@ -131,13 +157,26 @@ export function parseThemeLink(url: string): string | null {
   return null;
 }
 
-function normaliseLength(value: string, fallback: string): string {
-  const n = parseFloat(value);
-  if (Number.isFinite(n)) return `${n}rem`;
-  if (/^-?[\d.]+(rem|px|em)$/.test(value.trim())) {
-    return `${parseFloat(value)}rem`;
+function toNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const n = parseFloat(value);
+    if (Number.isFinite(n)) return n;
   }
-  return fallback;
+  return null;
+}
+
+function normaliseLength(value: unknown): string | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return `${value}rem`;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (/^-?\d+(\.\d+)?(rem|px|em)?$/.test(trimmed)) {
+      return `${parseFloat(trimmed)}rem`;
+    }
+  }
+  return null;
 }
 
 export type ImportOutcome =
@@ -178,24 +217,53 @@ export function importTheme(input: unknown): ImportOutcome {
 
   const lightOut: Record<string, string> = {};
   const darkOut: Record<string, string> = {};
+  const missing: string[] = [];
 
   for (const key of PARAMETER_KEYS) {
-    // Authority: theme wins for fonts and radius; light wins for the rest.
-    const sourceValue =
-      THEME_AUTHORITY_KEYS.has(key) && key in theme
-        ? theme[key]
-        : key in light
-          ? light[key]
-          : dark[key];
+    const themeWins = THEME_AUTHORITY_KEYS.has(key);
 
-    const lightValue =
-      key in light ? (light[key] as string) : (sourceValue as string);
-    const darkValue =
-      key in dark ? (dark[key] as string) : (lightValue as string);
+    // Resolve the authoritative light value. For fonts and radius the theme
+    // group wins; for everything else the light group wins.
+    let lightValue: unknown;
+    if (themeWins) {
+      lightValue = key in theme ? theme[key] : light[key];
+      if (key in theme && key in light) ignored.add(key);
+    } else {
+      lightValue = light[key];
+    }
+
+    // letter-spacing source order: light's letter-spacing, then light's
+    // tracking-normal, then theme's tracking-normal, then a 0em default.
+    // The value passes through unchanged (already em or calc()).
+    if (key === "letter-spacing") {
+      if (lightValue === undefined || lightValue === null) {
+        lightValue = light["tracking-normal"];
+      }
+      if (lightValue === undefined || lightValue === null) {
+        lightValue = theme["tracking-normal"];
+      }
+      if (lightValue === undefined || lightValue === null) {
+        lightValue = "0em";
+      }
+    }
+
+    // Colours are mode specific; every other parameter is unified across modes.
+    const darkValue = COLOR_KEYS.has(key)
+      ? key in dark
+        ? dark[key]
+        : lightValue
+      : lightValue;
+
+    if (lightValue === undefined || lightValue === null) {
+      missing.push(key);
+      continue;
+    }
 
     if (COLOR_KEYS.has(key)) {
-      const nl = normaliseColor(key, lightValue);
-      const nd = normaliseColor(key, darkValue);
+      const nl =
+        typeof lightValue === "string" ? normaliseColor(key, lightValue) : null;
+      const nd =
+        typeof darkValue === "string" ? normaliseColor(key, darkValue) : null;
       if (nl === null || nd === null) {
         return {
           ok: false,
@@ -205,34 +273,59 @@ export function importTheme(input: unknown): ImportOutcome {
       lightOut[key] = nl;
       darkOut[key] = nd;
     } else if (key === "radius") {
-      lightOut[key] = normaliseLength(lightValue, "0.5rem");
-      darkOut[key] = normaliseLength(darkValue, lightOut[key]);
+      const value = normaliseLength(lightValue);
+      if (value === null) {
+        return {
+          ok: false,
+          error: "`radius` is not a length this editor understands.",
+        };
+      }
+      lightOut[key] = value;
+      darkOut[key] = value;
     } else if (key === "shadow-opacity") {
-      lightOut[key] = `${parseFloat(lightValue) || 0}`;
-      darkOut[key] = `${parseFloat(darkValue) || 0}`;
-    } else if (
-      key === "shadow-blur" ||
-      key === "shadow-spread" ||
-      key === "shadow-offset-x" ||
-      key === "shadow-offset-y"
-    ) {
-      const nl = parseFloat(lightValue);
-      const nd = parseFloat(darkValue);
-      const fmt = (n: number) => (Number.isFinite(n) && n !== 0 ? `${n}px` : "0");
-      lightOut[key] = fmt(nl);
-      darkOut[key] = fmt(nd);
-    } else {
+      const value = toNumber(lightValue);
+      if (value === null) {
+        return {
+          ok: false,
+          error: `\`${key}\` is not a number this editor understands.`,
+        };
+      }
+      lightOut[key] = `${value}`;
+      darkOut[key] = `${value}`;
+    } else if (SHADOW_LENGTH_KEYS.has(key)) {
+      const value = toNumber(lightValue);
+      if (value === null) {
+        return {
+          ok: false,
+          error: `\`${key}\` is not a number this editor understands.`,
+        };
+      }
+      const formatted = value !== 0 ? `${value}px` : "0";
+      lightOut[key] = formatted;
+      darkOut[key] = formatted;
+    } else if (TEXT_KEYS.has(key)) {
+      if (typeof lightValue !== "string") {
+        return {
+          ok: false,
+          error: `\`${key}\` is not a string this editor understands.`,
+        };
+      }
       lightOut[key] = lightValue;
-      darkOut[key] = darkValue;
+      darkOut[key] = lightValue;
+    } else {
+      const value = typeof lightValue === "string" ? lightValue : String(lightValue);
+      lightOut[key] = value;
+      darkOut[key] = value;
     }
   }
 
-  // Unify the non-colour, non-mode keys across both modes (fonts, shadows,
-  // tracking, spacing) so the two modes cannot diverge after import.
-  for (const key of [...FONT_KEYS, ...SHADOW_KEYS, "letter-spacing", "spacing"]) {
-    if (!COLOR_KEYS.has(key)) {
-      darkOut[key] = lightOut[key];
-    }
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      error: `This theme is missing keys: ${missing
+        .map((k) => `--${k}`)
+        .join(", ")}.`,
+    };
   }
 
   return {

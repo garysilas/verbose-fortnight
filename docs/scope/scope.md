@@ -106,13 +106,13 @@ Spec [0005](../specs/0005-tweakcn-parameter-binding.md)
 Import and export tweakcn registry JSON and share links, so a theme round trips into this editor and back out unchanged.
 **Done when:** an imported tweakcn preset re-exported matches the source for every supported parameter, a share link loads, and an invalid or unsupported preset fails loudly instead of dropping values.
 - [x] Design it (spec): `/architect tweakcn preset interop`
-- [x] Build it: `/develop tweakcn preset interop`
+- [x] Build it: `/develop tweakcn preset interop` (all seven review findings fixed)
    - [x] Confirm the share link shape and record the endpoint (AC-7, AC-8)
    - [x] Export the registry item (AC-1)
    - [x] Parser, normaliser and ignored key report (AC-2 to AC-5)
    - [x] Import dialog with confirm, server route with host guard, tests (AC-6, AC-7)
-- [x] Verify it: `/check verify tweakcn preset interop` (verified manually by the coordinator: `/api/themes/claude` 200 with 44 light and 44 dark keys, unknown id 404, `..%2Fetc` 400, redirects refused, fixture carries no `token=`)
-- [x] Test it: `/test tweakcn preset interop` (real pass: `npm test` 13 tests across 3 files green)
+- [x] Verify it: `/check verify tweakcn preset interop` (verified manually by the coordinator: resolution order at `theme-import.ts:238-248` matches AC-14, authority proved by mutation, `MAX_PAYLOAD_BYTES` 256 KB rejected before parsing, host, path, id regex and redirect rule unchanged)
+- [x] Test it: `/test tweakcn preset interop` (real pass: `npm test` 24 tests across 3 files green, including the four letter spacing branches, the two size cap cases and the theme-wins regression)
 Spec [0006](../specs/0006-tweakcn-preset-interop.md)
 
 ## Deferred
@@ -121,6 +121,7 @@ Spec [0006](../specs/0006-tweakcn-preset-interop.md)
 - **Next 16 and React 19**: held at 14.2 and 18.2 by decision.
 - **Upstream registry sync**: tracking later shadcn releases, which would mean moving to the `radix-ui` and `tailwind-variants` family. Not authorized.
 - **v3 HSL export**: dropped by decision, v4 output only.
+- **Rate limiting on the themes route**: deferred on purpose. The app proxies a public JSON endpoint on a public demo and has no rate limiter anywhere else, so a token bucket on one route handler would be infrastructure without a home. Revisit if the app grows a shared limiter. The response size cap is not deferred; it is in the 0006 fix list.
 - **Chart palette for built in presets**: the derived palette is degenerate on neutral themes, since zinc's near zero chroma cannot separate five hues. Author real palettes or take them from an imported tweakcn preset.
 - **Chart type aliases**: `src/components/ui/chart.tsx` carries local type aliases that reconcile the registry chart written for recharts 3 with the pinned recharts 2.7.2. They are deliberate until the upgrade.
 - **recharts 3 upgrade**: would let those local aliases go. Not authorized.

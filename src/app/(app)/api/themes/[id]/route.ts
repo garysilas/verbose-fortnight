@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { importTheme } from "@/registry/theme-import";
+import { importTheme, parsePayloadText } from "@/registry/theme-import";
 
 const ENDPOINT = "https://tweakcn.com/r/themes/";
 const ID_RE = /^[A-Za-z0-9_-]+$/;
@@ -49,7 +49,14 @@ export async function GET(
 
   let payload: unknown;
   try {
-    payload = await res.json();
+    const parsed = parsePayloadText(await res.text());
+    if (!parsed.ok) {
+      return NextResponse.json(
+        { error: "That link could not be read. Paste the registry JSON instead." },
+        { status: 502 }
+      );
+    }
+    payload = parsed.value;
   } catch {
     return NextResponse.json(
       { error: "That link could not be read. Paste the registry JSON instead." },

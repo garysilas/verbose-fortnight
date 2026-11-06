@@ -4,6 +4,7 @@ import React from "react";
 import { useConfig } from "@/hooks/use-config";
 import { importTheme, parseThemeLink } from "@/registry/theme-import";
 import { CssVars } from "@/registry/themes";
+import { oklchToHex } from "./color.utils";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,22 @@ type Preview = {
   cssVars: CssVars;
   ignored: string[];
 };
+
+const SWATCH_KEYS = [
+  "background",
+  "foreground",
+  "primary",
+  "secondary",
+  "accent",
+  "destructive",
+  "border",
+  "ring",
+  "chart-1",
+  "chart-2",
+  "chart-3",
+  "chart-4",
+  "chart-5",
+] as const;
 
 export function ImportDialog() {
   const [config, setConfig] = useConfig();
@@ -136,9 +153,24 @@ export function ImportDialog() {
           {preview && (
             <div className="space-y-2 rounded-md border p-2">
               <div className="text-sm font-medium">Theme: {preview.name}</div>
+              <div className="flex flex-wrap gap-1">
+                {SWATCH_KEYS.map((key) => {
+                  const value = preview.cssVars.light[
+                    key as keyof typeof preview.cssVars.light
+                  ] as string | undefined;
+                  return (
+                    <div
+                      key={key}
+                      title={key}
+                      className="h-6 w-6 rounded-full border"
+                      style={{ backgroundColor: oklchToHex(value ?? "oklch(0 0 0)") }}
+                    />
+                  );
+                })}
+              </div>
               {preview.ignored.length > 0 && (
                 <div className="text-xs text-muted-foreground">
-                  <div>Ignored (derived or unsupported):</div>
+                  <div>Ignored keys:</div>
                   <div className="font-mono">
                     {preview.ignored.map((k) => `--${k}`).join(", ")}
                   </div>

@@ -25,15 +25,16 @@ Three details shape the design. `light` and `dark` each carry the 44 parameters 
 
 **Acceptance criteria**:
 - **AC-1**: export produces a registry item with `name` set to the current theme name, `type: "registry:style"` and `cssVars` holding `light` and `dark` with all 44 parameters.
-- **AC-2**: import accepts a registry item with `cssVars`, a bare `cssVars` object, or a bare `{ light, dark }` pair, and reads the `theme` group for the three fonts, radius and the tracking scale.
-- **AC-3**: only the 44 supported keys are applied. The nine derived keys (`shadow-2xs`, `shadow-xs`, `shadow-sm`, `shadow`, `shadow-md`, `shadow-lg`, `shadow-xl`, `shadow-2xl`, `tracking-normal`) and the `css` block are reported in the ignored list and never applied.
-- **AC-4**: one authority is stated and enforced. `theme` wins for fonts, radius and tracking; `light` wins for colours, spacing and the six shadow parameters when the modes disagree; any duplicate that was ignored is named in the report.
+- **AC-2**: import accepts a registry item with `cssVars`, a bare `cssVars` object, or a bare `{ light, dark }` pair, and reads the `theme` group for the three fonts and radius. Letter spacing follows AC-14.
+- **AC-3**: only the 44 supported keys are applied. The nine derived keys in `light` and `dark` (`shadow-2xs`, `shadow-xs`, `shadow-sm`, `shadow`, `shadow-md`, `shadow-lg`, `shadow-xl`, `shadow-2xl`, `tracking-normal`) and the `css` block are reported in the ignored list and never applied.
+- **AC-4**: one authority is stated and enforced. `theme` wins for fonts and radius; `light` wins for colours, spacing and the six shadow parameters when the modes disagree; any duplicate that was ignored is named in the report. Letter spacing follows AC-14.
 - **AC-5**: exporting after importing our own export is byte identical, and importing a foreign preset then exporting twice is stable from the second export onward, so normalisation is idempotent.
 - **AC-6**: invalid JSON, a missing `light` block or a non colour value fails with a readable message and leaves the current theme untouched.
 - **AC-7**: the user sees the parsed theme and its ignored keys and confirms before it is stored; cancelling changes nothing.
 - **AC-8**: a share link resolves on the server, and exactly two link shapes are accepted: `https://tweakcn.com/themes/<id>` and `https://tweakcn.com/r/themes/<id>.json`. Both normalise to the same id, the id is validated against a safe character set, and the fetch always goes to `https://tweakcn.com/r/themes/<id>.json`, so the shapes differ only in where the id is read. The response status decides existence: `200` parses, `500` and any other non success reads as a theme that does not exist. Editor URLs are rejected deliberately, because `/editor/theme/<id>` returns `307` to `/editor/theme` for a real id and a fake one alike.
 - **AC-9**: the route cannot be used as a proxy. It accepts only those two shapes on that host, fetches only the one fixed path, does not follow a redirect to another host, and returns its own JSON rather than the upstream body.
 - **AC-10**: any captured registry payload used as a fixture is sanitised before it is written: every `?token=` value is removed from every URL, including the ones inside `registryDependencies`, and the saved file contains no credential. The rule covers a payload from either service.
+- **AC-14**: letter spacing resolves in order: `light["letter-spacing"]` when present, else `light["tracking-normal"]` when present, else `theme["tracking-normal"]` when present, else the default `0em`. Values are already em or `calc(...)` and pass through unchanged. The scale keys (`tracking-tighter`, `tracking-tight`, `tracking-wide`, `tracking-wider`, `tracking-widest`) and the `dark` copy of `tracking-normal` stay reported and ignored. A test covers each branch.
 
 ## Options considered
 
@@ -100,9 +101,10 @@ Option 3 is now technically possible because the endpoint allows any origin, but
 
 | Field group | Authoritative location | Ignored duplicate |
 |---|---|---|
-| fonts, radius, tracking scale | `cssVars.theme` | `light` and `dark` copies, reported |
+| fonts, radius | `cssVars.theme` | `light` and `dark` copies, reported |
 | colours, spacing, six shadow parameters | `cssVars.light`, `cssVars.dark` | none |
 | derived shadows and `tracking-normal` | never read | `light` and `dark`, reported |
+| letter spacing | first present of `light["letter-spacing"]`, `light["tracking-normal"]`, `theme["tracking-normal"]`, else `0em` (AC-14) | the scale keys and the `dark` copy, reported |
 | `css` block | never applied | reported |
 
 **Normalisation rules**:
@@ -112,7 +114,7 @@ Option 3 is now technically possible because the endpoint allows any origin, but
 | colour | parse to oklch, re-serialise at three decimals for lightness and chroma, one for hue |
 | radius | accept a number or a length, store as a rem string from the `theme` group |
 | shadow numbers | accept `0.3` or `3px`, store the number with the documented unit |
-| tracking | read the scale from `theme`, store `tracking-normal` as em |
+| letter spacing | first present of `light["letter-spacing"]`, `light["tracking-normal"]`, `theme["tracking-normal"]`, else `0em`; values pass through unchanged |
 | derived key | report, never apply |
 
 **Error states**:
@@ -161,7 +163,7 @@ Carried in from 0005 and now landed before this slice's tasks: the `buildThemeCs
 
 1. Pin the route constants from the contract recorded above (host, path shape, id character set, status meanings) and capture one real payload as a fixture, stripping every token query value before it is saved, then search the file for `token=` and confirm none remains, satisfies **AC-8**, **AC-10**.
 2. Write `exportThemeItem(config)` next to the generator, satisfies **AC-1**.
-3. Write the parser, the whitelist, the authority rule and the normaliser, satisfies **AC-2**, **AC-3**, **AC-4**, **AC-5**, **AC-6**.
+3. Write the parser, the whitelist, the authority rule, the AC-14 letter spacing rule and the normaliser, satisfies **AC-2**, **AC-3**, **AC-4**, **AC-5**, **AC-6**, **AC-14**.
 4. Add the import dialog with paste, preview, ignored key list and confirm, satisfies **AC-7**.
 5. Add the route with the id check for both accepted link shapes, the fixed host and path, the status mapping and the no redirect rule, satisfies **AC-8**, **AC-9**.
 6. Add the round trip, captured payload, failure and proxy guard tests, then run `npm test` and the build, satisfies **AC-5**, **AC-6**, **AC-9**.
@@ -189,6 +191,28 @@ Carried in from 0005 and now landed before this slice's tasks: the `buildThemeCs
 3. Dialog and route.
 **Rollback**: revert the commit; no stored data changes shape.
 **Risks**: the endpoint moving or changing status meanings, which shows up as the "does not exist" message rather than a broken theme, and a captured payload that drifts from the live one, caught by the recorded fixture.
+
+## Review outcome
+
+Review by Verity on 2026-11-05. Verdict: ship with fixes. Report at `docs/reviews/0006-tweakcn-review.md`.
+
+Findings, all fixed and verified on 2026-11-05 before the slice closed: 24 tests green across 3 files, the authority rule proved by mutation (forcing light-wins made the theme-wins test fail), and the payload cap rejecting before parsing.
+
+- **High, AC-4.** `theme` does not win for fonts or radius. For an authority key the value is read from `theme`, then `light` overrides it whenever the key exists, which is the duplicate case the spec names. Probed directly: `light font-sans = "LIGHT-FONT"` with `theme font-sans = "THEME-FONT"` imports as the light value in both modes, and `theme radius = 0.25rem` with `light radius = 1rem` imports as `1rem`. The losing duplicate is also never reported as ignored, so the loss is silent. The test passed because the fixture duplicated identical values.
+- **High, all-or-nothing and AC-6.** A partial payload returns success with `undefined` tokens. A payload with the 32 colours and radius but no fonts or spacing imports, and the missing values only surface later when `buildThemeCss` throws. The dialog applies that config, so the preview is short of variables and the copy action throws. Non-colour keys are copied with no presence or type check.
+- **Medium, AC-6.** A missing `radius` throws a TypeError instead of returning a message, and the dialog's catch shows the network error text for JSON input.
+- **Low.** `font-sans: {}` imports and is stored as an object, which serialises as `[object Object]` in the preview. Prototype keys are only reported, never applied, and no pollution was observed.
+- **Low, AC-7.** The confirm step shows the theme name and the ignored keys but not the parsed colours, so a user confirms a theme they cannot see.
+- **Low, hardening, not in the coordinator's five.** The route read the upstream body with no size cap and has no rate limit. The timeout is 10 seconds. Neither breaks AC-9. The size cap is routed to Forge as fix item 6: reject before parsing at 256 KB, reusing the existing bad gateway shape. Rate limiting is deferred on purpose and recorded in the scope's Deferred list, because the app proxies a public JSON endpoint on a public demo and has no limiter anywhere else.
+- **Low, specification ambiguity, also not in the coordinator's five, resolved by decision.** The tracking scale was never read from `theme`, and `letter-spacing` came from `light`. AC-2 pointed at `theme` while AC-3 listed `tracking-normal` as never applied. The ruling is AC-14, now on its second version: the first named `theme["tracking-normal"]` as the fallback, and that key does not exist in a real payload. Read from the captured fixture, `theme` holds only the scale (`tracking-tighter`, `-tight`, `-wide`, `-wider`, `-widest`, each a `calc` against `--tracking-normal`), `light` holds `letter-spacing` and `tracking-normal`, and `dark` holds `letter-spacing` only. So the fallback would never fire. The corrected order is `light["letter-spacing"]`, then `light["tracking-normal"]`, then `theme["tracking-normal"]` for payloads shaped that way, then `0em`, with values passing through unchanged because they are already em or `calc(...)`. Forge has it with a test per branch.
+
+Confirmed sound, and this is the security evidence:
+
+- Route: id matched against `^[A-Za-z0-9_-]+$` before any fetch, fixed `https://tweakcn.com/r/themes/<id>.json`, `redirect: "manual"` with a 3xx read as not found, 500 and other non success read as not found, timeout or network as a bad gateway, an unparseable success as a bad gateway, an import failure as unprocessable, and the response built only from our own fields. No token header, no upstream echo, no logging.
+- Credentials: the fixture carries no `token=` and no `registryDependencies`, and the live value in `.env.local` appears in no other file. `.env.local` is untracked and ignored.
+- AC-3 holds: derived keys and the `css` block are reported and never applied. AC-5 holds: the zinc round trip is byte identical and a foreign fixture export is stable from the first export, 44 keys per mode. `npm test` was 13 green.
+
+**Specification gap to close.** AC-4 said `theme` wins and the code's own comment said the same, yet the implementation did the opposite and every test passed, because the fixture held identical duplicates. AC-14 then failed the same way in its first version, naming a source key that a real payload does not carry, which the fixture settled in one read and reasoning had not. Both are the same failure class: a spec asserting something plausible that the data contradicts. The next pass still owes an acceptance criterion that a disagreeing duplicate is exercised by a test, not only described, and a rule that any precedence claim about an external payload is checked against a captured sample before it is written. The spec is not restructured now; this note is the record.
 
 ## Follow-up
 
