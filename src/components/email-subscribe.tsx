@@ -37,7 +37,7 @@ export function EmailSubscribe() {
   return (
     <Card className="w-full max-w-4xl border-zinc-800/30 bg-black overflow-hidden">
       <CardContent className="p-0">
-        <div className="grid lg:grid-cols-[1fr,320px] gap-8 p-8">
+        <div className="p-8">
           <div className="space-y-6">
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-zinc-400">
@@ -85,22 +85,6 @@ export function EmailSubscribe() {
               Create Theme
               <ArrowRight className="w-4 h-4 ml-2 opacity-50" />
             </Button>
-          </div>
-
-          <div className="relative rounded-lg overflow-hidden bg-zinc-950/50 border border-zinc-800/30">
-            <a
-              href="https://tinte.railly.dev/shadcn"
-              target="_blank"
-              rel="noreferrer"
-              onClick={() => track("Tinte Link Clicked")}
-            >
-              <img
-                src="/tinte-2.png"
-                alt="tinte screenshot"
-                height={1400}
-                className="rounded-md hover:opacity-90 transition-opacity duration-200"
-              />
-            </a>
           </div>
         </div>
       </CardContent>
