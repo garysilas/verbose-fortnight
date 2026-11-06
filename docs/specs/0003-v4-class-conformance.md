@@ -140,6 +140,7 @@ Option 1 costs a review, which is cheap here because the shifted classes need no
 
 **Neutral**:
 - The generated registry file is edited by hand because the repo has no generator; that is a known gap recorded below.
+- The sweep covered renamed utilities only. Arbitrary values containing a comma, such as `lg:grid-cols-[1fr,320px]`, are a separate failure mode: Tailwind 4 does not emit them, with no build error and no warning, so the layout falls back silently. Search for `-\[[^]]*,` and write underscore separated arbitrary values in v4.
 
 ## Migration plan
 
@@ -153,6 +154,7 @@ Option 1 costs a review, which is cheap here because the shifted classes need no
 
 ## Follow-up
 
+- [x] One comma arbitrary value existed in application code, `lg:grid-cols-[1fr,320px]` on the home promo card, and it had silently collapsed the grid, so a 320px image rail rendered at full card width. Removed with the image in commit `fb9d339`. A search for `-\[[^]]*,` now returns nothing under `src`.
 - [ ] `src/__registry__/index.tsx` is generated upstream but has no generator script in this repo. Restore or write one so the strings stop being hand maintained.
 - [x] `tailwind-merge` 3.7.0 is installed and recorded in the lockfile, on the 3.x line chosen for v4 class awareness.
 - [ ] Upstream registry parity stays out of scope until someone decides to move to the `radix-ui` and `tailwind-variants` family.
